@@ -1,0 +1,133 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields: uid, email, displayName, photoURL, role, createdAt
+    //
+    // Collection: products
+    // Fields: name, description, price, category, image, stock, searchKeywords
+    //
+    // Collection: users/{userId}/cart
+    // Fields: productId, quantity, addedAt
+    //
+    // Collection: orders
+    // Fields: userId, items, total, status, address, createdAt
+    //
+    // Collection: users/{userId}/addresses
+    // Fields: label, street, city, state, zip
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+        (request.auth.token.email == "bittush28032002@gmail.com" && request.auth.token.email_verified == true)
+      );
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'role', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             data.role in ['user', 'admin'];
+    }
+
+    function isValidProduct(data) {
+      return hasOnlyAllowedFields(['name', 'description', 'price', 'category', 'image', 'stock', 'searchKeywords']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.price is number && data.price >= 0 &&
+             data.category in ['fruits', 'vegetables', 'dairy', 'snacks', 'beverages'] &&
+             isValidUrl(data.image);
+    }
+
+    function isValidCartItem(data) {
+      return hasOnlyAllowedFields(['productId', 'quantity', 'addedAt']) &&
+             data.productId is string &&
+             data.quantity is int && data.quantity > 0 && data.quantity <= 100;
+    }
+
+    function isValidOrder(data) {
+      return hasOnlyAllowedFields(['userId', 'items', 'total', 'status', 'address', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.items is list && data.items.size() > 0 &&
+             data.total is number && data.total >= 0 &&
+             data.status in ['pending', 'processing', 'shipped', 'delivered'];
+    }
+
+    function isValidAddress(data) {
+      return hasOnlyAllowedFields(['label', 'street', 'city', 'state', 'zip']) &&
+             data.label is string && data.label.size() > 0 &&
+             data.street is string && data.street.size() > 0 &&
+             data.city is string && data.city.size() > 0 &&
+             data.state is string && data.state.size() > 0 &&
+             data.zip is string && data.zip.size() > 0;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'user' || isAdmin());
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+
+      match /cart/{itemId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      match /addresses/{addressId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidOrder(request.resource.data);
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    match /test/connection {
+      allow read: if true;
+    }
+  }
+}

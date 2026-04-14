@@ -1,0 +1,104 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Grocery product details",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "category": { "type": "string", "enum": ["fruits", "vegetables", "dairy", "snacks", "beverages"] },
+        "image": { "type": "string", "format": "uri" },
+        "stock": { "type": "integer" },
+        "searchKeywords": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["name", "price", "category"]
+    },
+    "CartItem": {
+      "title": "CartItem",
+      "description": "An item in a user's cart",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string" },
+        "quantity": { "type": "integer" },
+        "addedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["productId", "quantity"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A completed grocery order",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": { "type": "string" },
+              "name": { "type": "string" },
+              "price": { "type": "number" },
+              "quantity": { "type": "integer" }
+            }
+          }
+        },
+        "total": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "processing", "shipped", "delivered"] },
+        "address": { "$ref": "Address" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "items", "total", "status", "createdAt"]
+    },
+    "Address": {
+      "title": "Address",
+      "description": "User shipping address",
+      "type": "object",
+      "properties": {
+        "label": { "type": "string" },
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "zip": { "type": "string" }
+      },
+      "required": ["label", "street", "city", "state", "zip"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile document"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Product catalog"
+    },
+    "/users/{userId}/cart/{itemId}": {
+      "schema": "CartItem",
+      "description": "User's shopping cart items"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Global orders collection"
+    },
+    "/users/{userId}/addresses/{addressId}": {
+      "schema": "Address",
+      "description": "User's saved addresses"
+    }
+  }
+}
